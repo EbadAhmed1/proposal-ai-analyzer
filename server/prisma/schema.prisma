@@ -1,0 +1,65 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum ProposalStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  passwordHash  String
+  portfolioText String?    @db.Text
+  createdAt     DateTime   @default(now())
+
+  proposals     Proposal[]
+
+  @@map("users")
+}
+
+model JobPosting {
+  id             String     @id @default(uuid())
+  title          String
+  description    String     @db.Text
+  source         String
+  requiredSkills String[]
+  createdAt      DateTime   @default(now())
+
+  proposals      Proposal[]
+
+  @@map("job_postings")
+}
+
+model Proposal {
+  id            String         @id @default(uuid())
+  userId        String
+  jobPostingId  String
+  status        ProposalStatus @default(PENDING)
+  generatedText String?        @db.Text
+  createdAt     DateTime       @default(now())
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobPosting    JobPosting     @relation(fields: [jobPostingId], references: [id], onDelete: Cascade)
+
+  @@map("proposals")
+}
