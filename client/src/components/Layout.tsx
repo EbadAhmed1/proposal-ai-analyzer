@@ -1,5 +1,6 @@
-import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, Wand2, LogOut, Zap } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { LayoutDashboard, Wand2, LogOut, Zap, Menu, X } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const navItems = [
@@ -10,6 +11,13 @@ const navItems = [
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  // Automatically close sidebar drawer when navigating to a new page on mobile
+  useEffect(() => {
+    setIsMobileOpen(false)
+  }, [location.pathname])
 
   const handleLogout = () => {
     logout()
@@ -17,19 +25,57 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-full">
-      {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <aside className="w-64 flex-shrink-0 flex flex-col border-r border-white/5 bg-zinc-900/50">
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-6 h-16 border-b border-white/5">
+    <div className="flex flex-col lg:flex-row h-screen overflow-hidden">
+      {/* ── Mobile Header ────────────────────────────────────────────────── */}
+      <header className="lg:hidden flex items-center justify-between px-6 h-16 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md flex-shrink-0">
+        <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/50">
             <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
           </div>
           <span className="font-bold text-base tracking-tight gradient-text">ProposeAI</span>
         </div>
+        <button
+          onClick={() => setIsMobileOpen(true)}
+          className="p-2 -mr-2 text-slate-400 hover:text-slate-100 transition-colors focus:outline-none"
+          aria-label="Open menu"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      </header>
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+      {/* ── Mobile Sidebar Backdrop Overlay ─────────────────────────────── */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 lg:hidden backdrop-blur-sm transition-opacity duration-300"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar (Collapsible Drawer on Mobile, Fixed Sidebar on Desktop) ─ */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-zinc-950 border-r border-white/5 flex flex-col transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Logo & Close Button */}
+        <div className="flex items-center justify-between px-6 h-16 border-b border-white/5 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/50">
+              <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
+            </div>
+            <span className="font-bold text-base tracking-tight gradient-text">ProposeAI</span>
+          </div>
+          <button
+            onClick={() => setIsMobileOpen(false)}
+            className="lg:hidden p-2 -mr-2 text-slate-400 hover:text-slate-100 transition-colors focus:outline-none"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Nav Links */}
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -48,8 +94,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
 
-        {/* User area */}
-        <div className="px-3 pb-4 border-t border-white/5 pt-4">
+        {/* User Area & Sign Out */}
+        <div className="px-3 pb-4 border-t border-white/5 pt-4 bg-zinc-950 flex-shrink-0">
           <div className="glass px-3 py-3 mb-2">
             <p className="text-xs font-semibold text-slate-300 truncate">{user?.email}</p>
             <p className="text-xs text-slate-500 mt-0.5">Freelancer</p>
@@ -64,8 +110,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* ── Main content ─────────────────────────────────────────────────── */}
-      <main className="flex-1 overflow-y-auto">
+      {/* ── Main Content Area ────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-y-auto min-w-0 bg-zinc-950/20">
         {children}
       </main>
     </div>
