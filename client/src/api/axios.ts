@@ -59,15 +59,18 @@ export interface Proposal {
   }
 }
 
-export interface SkillTrend {
-  skill: string
-  jobCount: number
+export interface DomainTrend {
+  domain: string
+  demandScore: number
   growthPercent: number
+  icon: string
+  topStacks: string[]
+  hotProjects: string[]
 }
 
 export interface TrendsData {
-  topSkills: SkillTrend[]
-  recentSources: { source: string; count: number }[]
+  domains: DomainTrend[]
+  lastUpdated: string
 }
 
 // Auth
