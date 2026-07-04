@@ -72,6 +72,48 @@ ${portfolioText}
 Write the freelance proposal now.`;
 }
 
+const REFINEMENT_SYSTEM_PROMPT = `\
+You are an expert freelance proposal writer with 10+ years of experience winning high-value contracts on platforms like Upwork, Toptal, and Freelancer.
+
+Your task is to refine and rewrite a previously generated freelance proposal based on the freelancer's specific feedback or request.
+
+Guidelines:
+  • Keep the core context (client requirements and freelancer strengths) but adjust the tone, style, focus, or length according to the feedback.
+  • Retain any good aspects of the previous draft while fully incorporating the new instruction.
+  • Keep the tone professional yet conversational — authoritative, not salesy.
+  • Length: 250–400 words. Concise and impactful.
+  • Do NOT include a subject line, salutation, or signature block — output only the proposal body.`;
+
+function buildRefinementUserPrompt(
+  jobDescription: string,
+  portfolioText: string,
+  previousDraft: string,
+  instruction: string
+): string {
+  return `\
+CLIENT'S JOB DESCRIPTION:
+${jobDescription}
+
+---
+
+FREELANCER'S PORTFOLIO / EXPERIENCE:
+${portfolioText}
+
+---
+
+PREVIOUS PROPOSAL DRAFT:
+${previousDraft}
+
+---
+
+REFINEMENT INSTRUCTION / REQUEST FROM FREELANCER:
+"${instruction}"
+
+---
+
+Revise the proposal now based on the instructions above.`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Dedicated consumer connection (separate from the publisher singleton)
 //
@@ -132,7 +174,7 @@ async function handleMessage(msg: ConsumeMessage): Promise<void> {
     return; // channel.nack is called in the wrapper
   }
 
-  const { proposalId, userId, jobDescription, jobTitle } = job;
+  const { proposalId, userId, jobDescription, jobTitle, refinementInstruction, previousDraft } = job;
 
   console.log(`[Worker] Processing proposal ${proposalId} for user ${userId}`);
   console.log(`[Worker] Job: "${jobTitle ?? 'Untitled'}"`);
@@ -158,21 +200,33 @@ async function handleMessage(msg: ConsumeMessage): Promise<void> {
   // ── 3. Call OpenAI ────────────────────────────────────────────────────────
   console.log(`[Worker] Calling OpenAI for proposal ${proposalId}…`);
 
+  const messages = refinementInstruction && previousDraft
+    ? [
+        {
+          role:    'system' as const,
+          content: REFINEMENT_SYSTEM_PROMPT,
+        },
+        {
+          role:    'user' as const,
+          content: buildRefinementUserPrompt(jobDescription, portfolioText, previousDraft, refinementInstruction),
+        },
+      ]
+    : [
+        {
+          role:    'system' as const,
+          content: SYSTEM_PROMPT,
+        },
+        {
+          role:    'user' as const,
+          content: buildUserPrompt(jobDescription, portfolioText),
+        },
+      ];
+
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
-    messages: [
-      {
-        role:    'system',
-        content: SYSTEM_PROMPT,
-      },
-      {
-        role:    'user',
-        content: buildUserPrompt(jobDescription, portfolioText),
-      },
-    ],
+    messages,
     temperature:  0.72,   // creative but consistent
     max_tokens:   700,    // ~400 words with buffer
-    // n: 1 (default) — one completion
   });
 
   const generatedText = completion.choices[0]?.message?.content?.trim();

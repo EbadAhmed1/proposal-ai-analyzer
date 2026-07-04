@@ -102,4 +102,6 @@ export const proposalApi = {
     api.get<{ data: { proposal: Proposal } }>(`/proposals/${id}`),
   list: () =>
     api.get<{ data: { proposals: Proposal[]; total: number } }>('/proposals'),
+  refine: (id: string, refinementInstruction: string) =>
+    api.post<{ data: { proposalId: string; status: string } }>(`/proposals/${id}/refine`, { refinementInstruction }),
 }

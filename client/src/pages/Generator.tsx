@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react'
 import {
   Wand2, Send, Copy, CheckCheck, AlertCircle, Clock,
-  RefreshCcw, ChevronDown, ChevronUp,
+  RefreshCcw, ChevronDown, ChevronUp, User as UserIcon, Save, CheckCircle2,
 } from 'lucide-react'
-import { proposalApi } from '../api/axios'
+import { proposalApi, userApi } from '../api/axios'
 
 type GenStatus = 'idle' | 'submitting' | 'polling' | 'completed' | 'failed'
 
@@ -32,7 +32,32 @@ export default function Generator() {
   const [pollCount,    setPollCount]    = useState(0)
   const [copied,       setCopied]       = useState(false)
 
+  // ── Portfolio state ───────────────────────────────────────────────────────
+  const [portfolio,          setPortfolio]          = useState('')
+  const [portfolioLoading,   setPortfolioLoading]   = useState(true)
+  const [portfolioSaving,     setPortfolioSaving]     = useState(false)
+  const [portfolioSaveStatus, setPortfolioSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [isPortfolioOpen,     setIsPortfolioOpen]     = useState(false)
+
+  // ── Refinement state ──────────────────────────────────────────────────────
+  const [refinementInput, setRefinementInput] = useState('')
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── Fetch portfolio context on mount ───────────────────────────────────────
+  useEffect(() => {
+    const fetchPortfolio = async () => {
+      try {
+        const res = await userApi.getProfile()
+        setPortfolio(res.data.data.user.portfolioText ?? '')
+      } catch {
+        // non-fatal
+      } finally {
+        setPortfolioLoading(false)
+      }
+    }
+    fetchPortfolio()
+  }, [])
 
   // ── Cleanup on unmount ───────────────────────────────────────────────────
   useEffect(() => {
@@ -72,6 +97,21 @@ export default function Generator() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [genStatus, proposalId])
 
+  // ── Save Portfolio ───────────────────────────────────────────────────────
+  const handleSavePortfolio = async () => {
+    setPortfolioSaving(true)
+    setPortfolioSaveStatus('idle')
+    try {
+      await userApi.updateProfile(portfolio)
+      setPortfolioSaveStatus('saved')
+      setTimeout(() => setPortfolioSaveStatus('idle'), 3000)
+    } catch {
+      setPortfolioSaveStatus('error')
+    } finally {
+      setPortfolioSaving(false)
+    }
+  }
+
   // ── Submit handler ────────────────────────────────────────────────────────
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -82,6 +122,19 @@ export default function Generator() {
     setGenStatus('submitting')
 
     try {
+      // 1. Validate portfolio is not empty
+      if (!portfolio.trim()) {
+        throw new Error('Your portfolio is empty. Please enter your portfolio context first.')
+      }
+      
+      // Auto-save portfolio
+      setPortfolioSaving(true)
+      await userApi.updateProfile(portfolio)
+      setPortfolioSaveStatus('saved')
+      setPortfolioSaving(false)
+      setTimeout(() => setPortfolioSaveStatus('idle'), 3000)
+
+      // 2. Generate proposal
       const res = await proposalApi.generate({
         jobTitle:       jobTitle.trim() || undefined,
         jobDescription: jobDescription.trim(),
@@ -90,12 +143,38 @@ export default function Generator() {
       setProposalId(res.data.data.proposalId)
       setGenStatus('polling')
     } catch (err: unknown) {
+      setPortfolioSaving(false)
       const msg =
+        (err as { message?: string })?.message ??
         (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
         'Submission failed. Make sure the API server is running.'
       setError(msg)
       setGenStatus('failed')
     }
+  }
+
+  // ── Refinement handlers ──────────────────────────────────────────────────
+  const handleRefine = async (instruction: string) => {
+    if (!proposalId) return
+    setError(null)
+    setGenStatus('submitting')
+    try {
+      await proposalApi.refine(proposalId, instruction)
+      setGenStatus('polling')
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Refinement failed. Please try again.'
+      setError(msg)
+      setGenStatus('failed')
+    }
+  }
+
+  const handleCustomRefine = (e: FormEvent) => {
+    e.preventDefault()
+    if (!refinementInput.trim()) return
+    handleRefine(refinementInput.trim())
+    setRefinementInput('')
   }
 
   // ── Copy to clipboard ─────────────────────────────────────────────────────
@@ -149,6 +228,75 @@ export default function Generator() {
                   {charCount < 50 ? `${50 - charCount} more chars needed` : `${charCount} / 20,000`}
                 </p>
               </div>
+            </div>
+
+            {/* My Portfolio Context (collapsible) */}
+            <div className="glass overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setIsPortfolioOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-5 py-3.5 text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <UserIcon className="w-4 h-4 text-indigo-400" />
+                  My Portfolio Context
+                </span>
+                {isPortfolioOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+
+              {isPortfolioOpen && (
+                <div className="px-5 pb-5 space-y-3 border-t border-white/5 pt-3">
+                  <p className="text-[11px] text-slate-500">
+                    Describe your skills, experience, and wins. The AI uses this to personalize the proposal.
+                  </p>
+                  {portfolioLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : (
+                    <textarea
+                      id="portfolio-textarea"
+                      value={portfolio}
+                      onChange={(e) => setPortfolio(e.target.value)}
+                      placeholder="e.g. Full-stack developer with 5 years experience in React and Node.js. Built 3 SaaS products..."
+                      className="input resize-none min-h-[150px] leading-relaxed text-xs"
+                      maxLength={10000}
+                      disabled={isRunning}
+                    />
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-slate-600">
+                      {portfolio.length.toLocaleString()}/10,000
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSavePortfolio}
+                      disabled={portfolioSaving || portfolioLoading || isRunning}
+                      className={`btn-primary px-3 py-1.5 text-xs ${
+                        portfolioSaveStatus === 'saved'
+                          ? '!from-emerald-600 !to-teal-600'
+                          : portfolioSaveStatus === 'error'
+                          ? '!from-red-600 !to-red-700'
+                          : ''
+                      }`}
+                    >
+                      {portfolioSaving ? (
+                        <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : portfolioSaveStatus === 'saved' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      ) : (
+                        <Save className="w-3.5 h-3.5" />
+                      )}
+                      {portfolioSaving ? 'Saving…' : portfolioSaveStatus === 'saved' ? 'Saved!' : 'Save Portfolio'}
+                    </button>
+                  </div>
+                  {portfolioSaveStatus === 'error' && (
+                    <p className="text-[11px] text-red-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> Failed to save.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Advanced (collapsible) */}
@@ -329,6 +477,50 @@ export default function Generator() {
                     >
                       <RefreshCcw className="w-4 h-4" />
                     </button>
+                  </div>
+
+                  {/* Refinement Options */}
+                  <div className="border-t border-white/5 pt-4 mt-2">
+                    <p className="text-xs font-semibold text-slate-300 mb-2">Refine this proposal</p>
+                    
+                    {/* Preset buttons */}
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {[
+                        { label: 'Make it more professional', instruction: 'Make the tone more professional, formal, and authoritative.' },
+                        { label: 'Make it shorter/concise', instruction: 'Make it significantly shorter, more direct, and concise (under 200 words).' },
+                        { label: 'Make it more enthusiastic', instruction: 'Make the tone more enthusiastic, friendly, and highly engaging.' },
+                        { label: 'Highlight tech stack details', instruction: 'Highlight the technical stacks and detailed software engineering aspects more prominently.' },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          disabled={isRunning}
+                          onClick={() => handleRefine(preset.instruction)}
+                          className="px-2.5 py-1.5 rounded bg-white/5 border border-white/10 text-[11px] text-slate-400 hover:text-slate-200 hover:bg-white/10 hover:border-white/20 transition-all font-medium"
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Custom instruction form */}
+                    <form onSubmit={handleCustomRefine} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={refinementInput}
+                        onChange={(e) => setRefinementInput(e.target.value)}
+                        placeholder="e.g. Focus more on my experience with React Native..."
+                        disabled={isRunning}
+                        className="input text-xs h-9 py-1 flex-1 bg-white/[0.03] border-white/10 text-slate-200"
+                      />
+                      <button
+                        type="submit"
+                        disabled={isRunning || !refinementInput.trim()}
+                        className="btn-primary py-1 px-4 text-xs h-9"
+                      >
+                        Refine
+                      </button>
+                    </form>
                   </div>
                 </div>
               )}

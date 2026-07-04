@@ -202,4 +202,106 @@ router.get(
   })
 );
 
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/proposals/:id/refine
+//
+// Pipeline:
+//   1. Validate request body (refinementInstruction).
+//   2. Validate proposal exists, belongs to user, and is COMPLETED.
+//   3. Update proposal status in DB to PENDING.
+//   4. Publish a ProposalJobMessage to RabbitMQ with refinement parameters.
+//   5. Return 202 Accepted immediately.
+// ─────────────────────────────────────────────────────────────────────────────
+
+router.post(
+  '/:id/refine',
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = req.params['id'] as string;
+    const userId = req.userId!;
+    const { refinementInstruction } = req.body as { refinementInstruction?: unknown };
+
+    if (!refinementInstruction || typeof refinementInstruction !== 'string') {
+      throw new AppError(400, 'refinementInstruction is required and must be a string');
+    }
+
+    const trimmedInstruction = refinementInstruction.trim();
+    if (trimmedInstruction.length === 0) {
+      throw new AppError(400, 'refinementInstruction cannot be empty');
+    }
+
+    if (trimmedInstruction.length > 2000) {
+      throw new AppError(400, 'refinementInstruction cannot exceed 2000 characters');
+    }
+
+    // Check if user has a portfolio first
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { portfolioText: true },
+    });
+
+    if (!user) {
+      throw new AppError(404, 'User account not found');
+    }
+
+    if (!user.portfolioText || user.portfolioText.trim().length === 0) {
+      throw new AppError(
+        422,
+        'Your portfolio is empty. Please update your portfolio before refining proposals.'
+      );
+    }
+
+    // Find the proposal
+    const proposal = await prisma.proposal.findFirst({
+      where: { id, userId },
+      include: { jobPosting: true },
+    });
+
+    if (!proposal) {
+      throw new AppError(404, 'Proposal not found or you do not have access to it');
+    }
+
+    if (proposal.status !== 'COMPLETED') {
+      throw new AppError(400, 'Only completed proposals can be refined');
+    }
+
+    // Keep the previous draft to send to RabbitMQ, update status to PENDING
+    const previousDraft = proposal.generatedText || '';
+
+    await prisma.proposal.update({
+      where: { id },
+      data: {
+        status: 'PENDING',
+      },
+    });
+
+    // Publish to RabbitMQ
+    const enqueued = await publishProposalJob({
+      proposalId: proposal.id,
+      userId,
+      jobDescription: proposal.jobPosting.description,
+      jobTitle: proposal.jobPosting.title,
+      refinementInstruction: trimmedInstruction,
+      previousDraft,
+    });
+
+    if (!enqueued) {
+      // Mark back as COMPLETED so it's not stuck in PENDING
+      await prisma.proposal.update({
+        where: { id: proposal.id },
+        data: { status: 'COMPLETED' },
+      });
+      throw new AppError(503, 'Queue unavailable. Please try again in a moment.');
+    }
+
+    res.status(202).json({
+      status: 'accepted',
+      message: 'Proposal refinement has been queued.',
+      data: {
+        proposalId: proposal.id,
+        status: 'PENDING',
+      },
+    });
+  })
+);
+
 export default router;

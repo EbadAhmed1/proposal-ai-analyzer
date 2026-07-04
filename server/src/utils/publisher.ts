@@ -9,6 +9,8 @@ export interface ProposalJobMessage {
   userId:         string;
   jobDescription: string;
   jobTitle:       string;
+  refinementInstruction?: string;
+  previousDraft?:         string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

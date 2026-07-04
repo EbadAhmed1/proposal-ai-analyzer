@@ -1,13 +1,12 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell,
 } from 'recharts'
 import {
-  TrendingUp, User, Save, RefreshCw, CheckCircle2, AlertCircle,
-  Flame, ChevronRight,
+  TrendingUp, RefreshCw, AlertCircle, Flame, ChevronRight,
 } from 'lucide-react'
-import { jobApi, userApi, type TrendsData, type DomainTrend } from '../api/axios'
+import { jobApi, type TrendsData, type DomainTrend } from '../api/axios'
 import { useAuth } from '../contexts/AuthContext'
 
 // ── Bar colours for demand chart ─────────────────────────────────────────
@@ -118,11 +117,7 @@ export default function Dashboard() {
   const [trendsError,   setTrendsError]   = useState<string | null>(null)
   const [cacheStatus,   setCacheStatus]   = useState<string>('')
 
-  // ── Profile state ─────────────────────────────────────────────────────────
-  const [portfolio,      setPortfolio]      = useState('')
-  const [profileLoading, setProfileLoading] = useState(true)
-  const [saving,         setSaving]         = useState(false)
-  const [saveStatus,     setSaveStatus]     = useState<'idle' | 'saved' | 'error'>('idle')
+
 
   // ── Fetch trends ──────────────────────────────────────────────────────────
   const fetchTrends = async () => {
@@ -139,39 +134,9 @@ export default function Dashboard() {
     }
   }
 
-  // ── Fetch profile ─────────────────────────────────────────────────────────
-  const fetchProfile = async () => {
-    setProfileLoading(true)
-    try {
-      const res = await userApi.getProfile()
-      setPortfolio(res.data.data.user.portfolioText ?? '')
-    } catch {
-      // non-fatal
-    } finally {
-      setProfileLoading(false)
-    }
-  }
-
   useEffect(() => {
     fetchTrends()
-    fetchProfile()
   }, [])
-
-  // ── Save portfolio ────────────────────────────────────────────────────────
-  const handleSave = async (e: FormEvent) => {
-    e.preventDefault()
-    setSaving(true)
-    setSaveStatus('idle')
-    try {
-      await userApi.updateProfile(portfolio)
-      setSaveStatus('saved')
-      setTimeout(() => setSaveStatus('idle'), 3000)
-    } catch {
-      setSaveStatus('error')
-    } finally {
-      setSaving(false)
-    }
-  }
 
   // Sort domains by market share percentage for the chart
   const chartData = trends?.domains
@@ -292,70 +257,6 @@ export default function Dashboard() {
               </div>
             </>
           ) : null}
-        </div>
-      </section>
-
-      {/* ── Portfolio Profile Section ──────────────────────────────────────── */}
-      <section>
-        <div className="glass p-5 sm:p-6 max-w-2xl">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center">
-              <User className="w-4 h-4 text-indigo-400" />
-            </div>
-            <h2 className="section-title">My Portfolio</h2>
-          </div>
-
-          <p className="text-xs text-slate-500 mb-3">
-            Describe your skills, experience, and past wins. The AI uses this to personalise every proposal.
-          </p>
-
-          <form onSubmit={handleSave} className="flex flex-col gap-3">
-            {profileLoading ? (
-              <div className="flex items-center justify-center h-[200px]">
-                <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : (
-              <textarea
-                id="portfolio-textarea"
-                value={portfolio}
-                onChange={(e) => setPortfolio(e.target.value)}
-                placeholder="e.g. Full-stack developer with 5 years experience in React and Node.js. Built 3 SaaS products from 0→$10k MRR. Strong in TypeScript, PostgreSQL, and cloud deployments…"
-                className="input resize-none min-h-[200px] leading-relaxed"
-                maxLength={10000}
-              />
-            )}
-
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-600">{portfolio.length}/10,000</span>
-              <button
-                type="submit"
-                id="save-portfolio-btn"
-                disabled={saving || profileLoading}
-                className={`btn-primary ${
-                  saveStatus === 'saved'
-                    ? '!from-emerald-600 !to-teal-600'
-                    : saveStatus === 'error'
-                    ? '!from-red-600 !to-red-700'
-                    : ''
-                }`}
-              >
-                {saving ? (
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : saveStatus === 'saved' ? (
-                  <CheckCircle2 className="w-4 h-4" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                {saving ? 'Saving…' : saveStatus === 'saved' ? 'Saved!' : 'Save Portfolio'}
-              </button>
-            </div>
-
-            {saveStatus === 'error' && (
-              <p className="text-xs text-red-400 flex items-center gap-1">
-                <AlertCircle className="w-3 h-3" /> Failed to save. Please try again.
-              </p>
-            )}
-          </form>
         </div>
       </section>
     </div>
