@@ -163,6 +163,7 @@ router.get(
         id:        true,
         status:    true,
         createdAt: true,
+        fitScore:  true,
         jobPosting: {
           select: { title: true, source: true },
         },
@@ -195,6 +196,10 @@ router.get(
         status:        true,
         generatedText: true,
         createdAt:     true,
+        fitScore:      true,
+        matchingSkills: true,
+        missingSkills:  true,
+        fitReasoning:   true,
         jobPosting: {
           select: {
             title:          true,
