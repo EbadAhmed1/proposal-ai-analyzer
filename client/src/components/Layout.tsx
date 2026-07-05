@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Wand2, LogOut, Zap, Menu, X, Upload, Briefcase } from 'lucide-react'
+import { LayoutDashboard, Wand2, LogOut, Zap, Menu, X, Briefcase } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
   { to: '/generator', label: 'Generator',  icon: Wand2 },
-  { to: '/cv-upload', label: 'Upload CV',  icon: Upload },
-  { to: '/jobs',      label: 'Find Jobs',  icon: Briefcase },
+  { to: '/jobs',      label: 'Jobs',       icon: Briefcase },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {

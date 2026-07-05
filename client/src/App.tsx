@@ -5,7 +5,6 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Generator from './pages/Generator'
-import CVUpload from './pages/CVUpload'
 import JobSearch from './pages/JobSearch'
 
 export default function App() {
@@ -34,16 +33,6 @@ export default function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Generator />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/cv-upload"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <CVUpload />
                   </Layout>
                 </ProtectedRoute>
               }

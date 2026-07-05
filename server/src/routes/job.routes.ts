@@ -245,16 +245,20 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const userId = req.userId!;
     const preference = (req.query['preference'] as string) || 'both';
+    const skillsParam = req.query['skills'] as string | undefined;
 
     // ── 1. Cache look-up ──────────────────────────────────────────────────
-    const cacheKey = `job_search:${userId}:${preference}`;
+    const cacheKey = skillsParam
+      ? `job_search:${userId}:${preference}:skills:${skillsParam}`
+      : `job_search:${userId}:${preference}`;
+
     const cached = await getCached<object>(cacheKey);
     if (cached) {
       res.setHeader('X-Cache', 'HIT');
       return res.json({ status: 'success', meta: { cacheStatus: 'hit' }, data: cached });
     }
 
-    // ── 2. Fetch user skills ───────────────────────────────────────────────
+    // ── 2. Fetch user details if needed, parse skills ──────────────────────
     const user = await prisma.user.findUnique({
       where:  { id: userId },
       select: { extractedSkills: true, jobPreference: true },
@@ -262,13 +266,21 @@ router.get(
 
     if (!user) throw new AppError(404, 'User not found');
 
-    const userSkills = user.extractedSkills.map((s) => s.toLowerCase());
+    let activeSkills = user.extractedSkills;
+    if (skillsParam !== undefined) {
+      activeSkills = skillsParam
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+
+    const userSkills = activeSkills.map((s) => s.toLowerCase());
     const effectivePreference = preference !== 'both' ? preference : (user.jobPreference ?? 'both');
 
     if (userSkills.length === 0) {
       return res.json({
         status: 'success',
-        data: { jobs: [], total: 0, message: 'Upload your CV first to see personalised job matches.' },
+        data: { jobs: [], total: 0, message: 'Upload your CV first or search for custom skill tags to see job matches.' },
       });
     }
 

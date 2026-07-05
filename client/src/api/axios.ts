@@ -148,9 +148,12 @@ export const cvApi = {
 // Jobs
 export const jobApi = {
   getTrends: () => api.get<{ data: TrendsData }>('/jobs/trends'),
-  search: (preference?: string) =>
+  search: (preference?: string, skills?: string[]) =>
     api.get<{ data: { jobs: Job[]; total: number; message?: string } }>('/jobs/search', {
-      params: preference ? { preference } : {},
+      params: {
+        ...(preference ? { preference } : {}),
+        ...(skills && skills.length > 0 ? { skills: skills.join(',') } : {}),
+      },
     }),
   getById: (id: string) =>
     api.get<{ data: { job: Job & { description: string } } }>(`/jobs/${id}`),
