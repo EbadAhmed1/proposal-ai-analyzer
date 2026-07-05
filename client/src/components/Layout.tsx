@@ -5,8 +5,8 @@ import { useAuth } from '../contexts/AuthContext'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard',  icon: LayoutDashboard },
-  { to: '/generator', label: 'Generator',  icon: Wand2 },
   { to: '/jobs',      label: 'Jobs',       icon: Briefcase },
+  { to: '/generator', label: 'Generator',  icon: Wand2 },
 ]
 
 export default function Layout({ children }: { children: React.ReactNode }) {

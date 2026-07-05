@@ -322,9 +322,9 @@ router.get(
     const ranked = jobs
       .map((job) => {
         const jobSkills = job.requiredSkills.map((s) => s.toLowerCase());
-        const matches   = userSkills.filter((s) => jobSkills.some((js) => js.includes(s) || s.includes(js)));
+        const matches   = jobSkills.filter((js) => userSkills.some((s) => js.includes(s) || s.includes(js)));
         const matchPercent = jobSkills.length > 0
-          ? Math.round((matches.length / jobSkills.length) * 100)
+          ? Math.min(Math.round((matches.length / jobSkills.length) * 100), 100)
           : 0;
         return { ...job, matchPercent, matchCount: matches.length };
       })

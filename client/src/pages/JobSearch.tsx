@@ -61,7 +61,10 @@ function ScoreRing({ score }: { score: number }) {
   const color       = score >= 70 ? '#10b981' : score >= 40 ? '#f59e0b' : '#ef4444'
 
   return (
-    <div className="relative w-24 h-24 flex items-center justify-center flex-shrink-0">
+    <div
+      className="relative w-24 h-24 flex items-center justify-center flex-shrink-0 cursor-help"
+      title="Fit Score: AI-assessed compatibility based on required skills, experience level, and role alignment."
+    >
       <svg className="absolute inset-0 -rotate-90" viewBox="0 0 88 88">
         <circle cx="44" cy="44" r={radius} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
         <circle
@@ -109,13 +112,16 @@ function JobCard({ job, isSelected, onClick }: {
         </div>
         {/* Match badge */}
         {score > 0 && (
-          <span className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${
-            score >= 70
-              ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
-              : score >= 40
-              ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
-              : 'bg-slate-500/15 text-slate-400 border border-white/5'
-          }`}>
+          <span
+            className={`flex-shrink-0 text-xs font-bold px-2 py-0.5 rounded-full cursor-help ${
+              score >= 70
+                ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25'
+                : score >= 40
+                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/25'
+                : 'bg-slate-500/15 text-slate-400 border border-white/5'
+            }`}
+            title="Skill Match: Percentage of this job's required skills matched by your active CV skills."
+          >
             {score}%
           </span>
         )}
