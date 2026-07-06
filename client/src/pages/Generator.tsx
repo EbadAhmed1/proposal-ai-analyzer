@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Wand2, Send, Copy, CheckCheck, AlertCircle, Clock,
   RefreshCcw, ChevronDown, ChevronUp, User as UserIcon, Save, CheckCircle2,
@@ -18,6 +19,9 @@ const statusMeta: Record<GenStatus, { label: string; color: string }> = {
 }
 
 export default function Generator() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const queryProposalId = searchParams.get('proposalId')
+
   // ── Form state ───────────────────────────────────────────────────────────
   const [jobTitle,       setJobTitle]       = useState('')
   const [jobDescription, setJobDescription] = useState('')
@@ -75,6 +79,16 @@ export default function Generator() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [])
 
+  // ── Handle incoming query parameters on mount ─────────────────────────────
+  useEffect(() => {
+    if (queryProposalId) {
+      setProposalId(queryProposalId)
+      setGenStatus('polling')
+      // Clear the query parameter so refreshing doesn't lock the page to this proposal
+      setSearchParams({}, { replace: true })
+    }
+  }, [queryProposalId, setSearchParams])
+
   // ── Polling effect ───────────────────────────────────────────────────────
   useEffect(() => {
     if (genStatus !== 'polling' || !proposalId) return
@@ -85,10 +99,28 @@ export default function Generator() {
         const res = await proposalApi.getById(proposalId)
         const proposal = res.data.data.proposal
 
+        // Set the form fields immediately as soon as we retrieve the proposal data (even if PENDING)
+        if (proposal.jobPosting) {
+          setJobTitle(proposal.jobPosting.title || '')
+          setJobDescription(proposal.jobPosting.description || '')
+          setJobSource(proposal.jobPosting.source || '')
+        }
+
         if (proposal.status === 'COMPLETED') {
           setGeneratedText(proposal.generatedText ?? '')
           setCompletedProposal(proposal)
           setGenStatus('completed')
+
+          // Display compatibility ring/score on success
+          if (proposal.fitScore !== null && proposal.fitScore !== undefined) {
+            setFitAnalysis({
+              score: proposal.fitScore,
+              matchingSkills: proposal.matchingSkills || [],
+              missingSkills: proposal.missingSkills || [],
+              reasoning: proposal.fitReasoning || '',
+            })
+          }
+
           if (intervalRef.current) clearInterval(intervalRef.current)
         } else if (proposal.status === 'FAILED') {
           setError('The AI worker failed to generate a proposal. Please try again.')

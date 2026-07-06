@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Search, Briefcase, MapPin, DollarSign, ExternalLink,
   ChevronRight, AlertCircle, Loader2, X, Wand2,
@@ -163,6 +164,7 @@ function FitPanel({ job, onClose, onGenerateProposal }: {
   const [fullJob,      setFullJob]      = useState<(Job & { description: string }) | null>(null)
   const [generating,   setGenerating]   = useState(false)
   const [genSuccess,   setGenSuccess]   = useState(false)
+  const [queuedProposalId, setQueuedProposalId] = useState<string | null>(null)
 
   // Fetch full job details + fit report
   useEffect(() => {
@@ -195,7 +197,7 @@ function FitPanel({ job, onClose, onGenerateProposal }: {
     if (!fit || !fullJob) return
     setGenerating(true)
     try {
-      await proposalApi.generate({
+      const res = await proposalApi.generate({
         jobTitle:       fullJob.title,
         jobDescription: fullJob.description,
         jobSource:      fullJob.source,
@@ -204,6 +206,7 @@ function FitPanel({ job, onClose, onGenerateProposal }: {
         missingSkills:  fit.missingSkills,
         fitReasoning:   fit.reasoning,
       })
+      setQueuedProposalId(res.data.data.proposalId)
       setGenSuccess(true)
       onGenerateProposal(job, fit)
     } catch {
@@ -308,8 +311,16 @@ function FitPanel({ job, onClose, onGenerateProposal }: {
       <div className="p-5 border-t border-white/5 flex-shrink-0 space-y-2">
         {genSuccess ? (
           <div className="flex items-center gap-2 text-sm text-emerald-400 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-            <CheckCircle2 className="w-4 h-4" />
-            Proposal queued! Go to the Generator to view it.
+            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+            <span>
+              Proposal queued!{' '}
+              <Link
+                to={`/generator?proposalId=${queuedProposalId}`}
+                className="underline font-semibold hover:text-emerald-300 transition-colors"
+              >
+                Go to the Generator to view it.
+              </Link>
+            </span>
           </div>
         ) : (
           <button
